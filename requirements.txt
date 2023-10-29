@@ -1,0 +1,6 @@
+
+https://github.com/AmanoTeam/pyrogram/archive/master.zip
+httpx[http2]
+async-lru
+meval
+TgCrypto
