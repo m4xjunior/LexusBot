@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  mt5:
+    build:
+      context: ./infra/mt5
+    platform: linux/amd64
+    environment:
+      - WINEARCH=win64
+      - WINEPREFIX=/data/wine
+      - DISPLAY=:99
+      - TZ=${TZ:-UTC}
+      - MT5_INSTALL_DIR=/opt/mt5
+      - MT5_DATA_DIR=/opt/mt5_data
+    volumes:
+      - mt5_install:/opt/mt5
+      - mt5_data:/opt/mt5_data
+      - wine_prefix:/data/wine
+    restart: unless-stopped
+
+volumes:
+  mt5_install:
+  mt5_data:
+  wine_prefix:
