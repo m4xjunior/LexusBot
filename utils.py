@@ -80,11 +80,43 @@ def get_info_wallet(user_id: int) -> str:
             username = "Sem username"
         return base.format(name_user, username, id, balance, balance_diamonds)
 
+def get_user_transactions(user_id: int, limit: int = 10) -> list:
+    """Retorna uma lista das últimas transações de um usuário."""
+    q = cur.execute(
+        "SELECT type, value, add_balance_date FROM sold_balance WHERE owner = ? ORDER BY add_balance_date DESC LIMIT ?",
+        [user_id, limit]
+    )
+    return q.fetchall()
+
+
 def insert_sold_balance(value: int, owner: int, type_add_saldo: str, quantity: int = 1):
     cur.execute(
         """INSERT INTO sold_balance(type, value, owner, quantity) VALUES(?, ?, ?, ?)""",
         [type_add_saldo, value, owner, quantity],
     )
+
+
+def redeem_diamonds(user_id: int, diamonds_amount: float) -> bool:
+    """Resgata diamantes por saldo, retorna True se bem-sucedido, False caso contrário."""
+    cur.execute("BEGIN TRANSACTION")
+    try:
+        q = cur.execute("SELECT balance, balance_diamonds FROM users WHERE id = ?", [user_id]).fetchone()
+        if q:
+            current_balance, current_diamonds = q
+            if current_diamonds >= diamonds_amount and diamonds_amount > 0:
+                new_balance = current_balance + diamonds_amount # Assumindo 1 diamante = 1 BRL
+                new_diamonds = current_diamonds - diamonds_amount
+                cur.execute("UPDATE users SET balance = ?, balance_diamonds = ? WHERE id = ?",
+                            [new_balance, new_diamonds, user_id])
+                insert_sold_balance(diamonds_amount, user_id, "resgate_diamantes") # Registrar como venda/transacao
+                cur.execute("COMMIT")
+                return True
+        cur.execute("ROLLBACK")
+        return False
+    except Exception as e:
+        cur.execute("ROLLBACK")
+        print(f"Erro ao resgatar diamantes: {e}")
+        return False
 
 
 def create_mention(user: User, with_id: bool = True) -> str:
@@ -121,7 +153,7 @@ def get_crc16(payload: str):
 
 def create_copy_paste_pix(location: str) -> str:
     
-    copy_paste = f"00020126830014br.gov.bcb.pix2561{location}520489995303986540105802BR5921Pagseguro Internet SA6009SAO PAULO62070503***6304"
+    copy_paste = f"00020126830014br.gov.bcb.pix2561{location}520489995303986540105802BR5921{get_lara_info()[0]}6009SAO PAULO62070503***6304"
 
     return copy_paste + get_crc16(copy_paste)
 

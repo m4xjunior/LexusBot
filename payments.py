@@ -69,41 +69,52 @@ class MercadoPago:
         expire = expire_date_mp(time)
         self.user_id = user_id
         
-        payment = await hc.post(
-            "https://api.mercadopago.com/v1/payments",
-            headers={"Authorization": f"Bearer {self.acess_token}"},
-            json={
-                "transaction_amount": float(value),
-                "description": "saldo",
-                "payment_method_id": "pix",
-                "payer": {
-                    "email":"daniel.silva.bsb@gmail.com" ,
-                    
-                    
-                    "identification": {"type": "cpf", "number": cpf},
-                    "address": {},
+        try:
+            payment = await hc.post(
+                "https://api.mercadopago.com/v1/payments",
+                headers={"Authorization": f"Bearer {self.acess_token}"},
+                json={
+                    "transaction_amount": float(value),
+                    "description": "saldo",
+                    "payment_method_id": "pix",
+                    "payer": {
+                        "email":"daniel.silva.bsb@gmail.com" ,
+                        
+                        
+                        "identification": {"type": "cpf", "number": cpf},
+                        "address": {},
+                    },
+                    "date_of_expiration": expire,
                 },
-                "date_of_expiration": expire,
-            },
-        )
+            )
+            payment.raise_for_status() # Levanta um erro para status HTTP 4xx/5xx
 
-        rjson: dict = payment.json()
+            rjson: dict = payment.json()
 
-        self.payment_id = rjson.get("id")
+            self.payment_id = rjson.get("id")
 
-        self.user_name = full_name
-        
-        rt = {
-            "payment_id": rjson.get("id"),
-            "copy_paste": rjson.get("point_of_interaction")
-            .get("transaction_data")
-            .get("qr_code"),
-            "qr_code": rjson.get("point_of_interaction")
-            .get("transaction_data")
-            .get("qr_code_base64"),
-            "status": rjson.get("status"),
-        }
-        return rt
+            self.user_name = full_name
+            
+            rt = {
+                "payment_id": rjson.get("id"),
+                "copy_paste": rjson.get("point_of_interaction")\
+                .get("transaction_data")\
+                .get("qr_code"),
+                "qr_code": rjson.get("point_of_interaction")\
+                .get("transaction_data")\
+                .get("qr_code_base64"),
+                "status": rjson.get("status"),
+            }
+            return rt
+        except httpx.RequestError as exc:
+            print(f"Erro ao criar pagamento no Mercado Pago: {exc}")
+            return {"status": "error", "message": f"Erro de conexão: {exc.request.url}"}
+        except httpx.HTTPStatusError as exc:
+            print(f"Erro de status HTTP {exc.response.status_code} ao criar pagamento no Mercado Pago: {exc.response.text}")
+            return {"status": "error", "message": f"Erro da API: {exc.response.status_code} - {exc.response.text}"}
+        except Exception as exc:
+            print(f"Erro inesperado ao criar pagamento no Mercado Pago: {exc}")
+            return {"status": "error", "message": "Erro inesperado ao criar pagamento."}
 
     async def verify(self):
         rtr = await hc.get(
@@ -183,23 +194,35 @@ class Gerencianet:
             "solicitacaoPagador": "Informe o número ou identificador do pedido.",
         }
         self.header = header
-        dados = await self.hc.post(
-            "https://api-pix.gerencianet.com.br/v2/cob",
-            headers=header,
-            json=payload,
-        )
-        djson = dados.json()
-        ID = djson["loc"]["id"]
-        
-        url = f"https://api-pix.gerencianet.com.br/v2/loc/{ID}/qrcode"
-        rt = await self.hc.get(url, headers=header)
+        try:
+            dados = await self.hc.post(
+                "https://api-pix.gerencianet.com.br/v2/cob",
+                headers=header,
+                json=payload,
+            )
+            dados.raise_for_status()
+            djson = dados.json()
+            ID = djson["loc"]["id"]
+            
+            url = f"https://api-pix.gerencianet.com.br/v2/loc/{ID}/qrcode"
+            rt = await self.hc.get(url, headers=header)
+            rt.raise_for_status()
 
-        self.payment_id = djson["txid"]
-        self.user_id = user_id
+            self.payment_id = djson["txid"]
+            self.user_id = user_id
 
-        rjson = rt.json()
+            rjson = rt.json()
 
-        return rjson
+            return rjson
+        except httpx.RequestError as exc:
+            print(f"Erro ao criar pagamento na Gerencianet: {exc}")
+            return {"status": "error", "message": f"Erro de conexão: {exc.request.url}"}
+        except httpx.HTTPStatusError as exc:
+            print(f"Erro de status HTTP {exc.response.status_code} ao criar pagamento na Gerencianet: {exc.response.text}")
+            return {"status": "error", "message": f"Erro da API: {exc.response.status_code} - {exc.response.text}"}
+        except Exception as exc:
+            print(f"Erro inesperado ao criar pagamento na Gerencianet: {exc}")
+            return {"status": "error", "message": "Erro inesperado ao criar pagamento."}
 
     async def verify(self):
         url = f"https://api-pix.gerencianet.com.br/v2/cob/{self.payment_id}"  
@@ -289,8 +312,19 @@ class PagBank:
             "solicitacaoPagador": "Compra de saldo",
         }
 
-        rt = await self.hc.put(url, headers=self.headers, json=payload)
-        return rt.json()
+        try:
+            rt = await self.hc.put(url, headers=self.headers, json=payload)
+            rt.raise_for_status()
+            return rt.json()
+        except httpx.RequestError as exc:
+            print(f"Erro ao criar pagamento no PagBank: {exc}")
+            return {"status": "error", "message": f"Erro de conexão: {exc.request.url}"}
+        except httpx.HTTPStatusError as exc:
+            print(f"Erro de status HTTP {exc.response.status_code} ao criar pagamento no PagBank: {exc.response.text}")
+            return {"status": "error", "message": f"Erro da API: {exc.response.status_code} - {exc.response.text}"}
+        except Exception as exc:
+            print(f"Erro inesperado ao criar pagamento no PagBank: {exc}")
+            return {"status": "error", "message": "Erro inesperado ao criar pagamento."}
 
     async def verify(self):
         rt = await self.hc.get(
@@ -366,16 +400,28 @@ class Juno:
             "X-Idempotency-Key": str(uuid.uuid4()).upper(),
         }
 
-        cob_imediata = await hc.put(
-            url=f"https://api.juno.com.br/pix-api/v2/cob/{self.txid}",
-            headers=self.headers,
-            json=dados_cob,
-        )
-        qr_code = await hc.get(
-            f"https://api.juno.com.br/pix-api/qrcode/v2/{self.txid}",
-            headers=self.headers,
-        )
-        return base64.b64decode(qr_code.json()["qrcodeBase64"]).decode()
+        try:
+            cob_imediata = await hc.put(
+                url=f"https://api.juno.com.br/pix-api/v2/cob/{self.txid}",
+                headers=self.headers,
+                json=dados_cob,
+            )
+            cob_imediata.raise_for_status()
+            qr_code = await hc.get(
+                f"https://api.juno.com.br/pix-api/qrcode/v2/{self.txid}",
+                headers=self.headers,
+            )
+            qr_code.raise_for_status()
+            return base64.b64decode(qr_code.json()["qrcodeBase64"]).decode()
+        except httpx.RequestError as exc:
+            print(f"Erro ao criar pagamento na Juno: {exc}")
+            return {"status": "error", "message": f"Erro de conexão: {exc.request.url}"}
+        except httpx.HTTPStatusError as exc:
+            print(f"Erro de status HTTP {exc.response.status_code} ao criar pagamento na Juno: {exc.response.text}")
+            return {"status": "error", "message": f"Erro da API: {exc.response.status_code} - {exc.response.text}"}
+        except Exception as exc:
+            print(f"Erro inesperado ao criar pagamento na Juno: {exc}")
+            return {"status": "error", "message": "Erro inesperado ao criar pagamento."}
 
     async def verify(self):
         rt = await hc.get(

@@ -1,8 +1,11 @@
-BOT_TOKEN = "6211829993:AAGG1ChoJaw259H1e0HE3rrAmBuW6Rr0YMc"
+
+import os
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "6211829993:AAGG1ChoJaw259H1e0HE3rrAmBuW6Rr0YMc")
 
 # ID e hash da API do telegrama. Este NÃO é o seu token de bot e não deve ser alterado.
-API_ID = 611335
-API_HASH = "d524b414d21f4d37f08684c1df41ac9c"
+API_ID = int(os.getenv("API_ID", "611335"))
+API_HASH = os.getenv("API_HASH", "d524b414d21f4d37f08684c1df41ac9c")
 
 # Chat usado para registrar erros.
 LOG_CHAT = -1001659391281
